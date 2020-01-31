@@ -2,26 +2,95 @@ use core::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::btree_map::BTreeMap;
 
+struct PrefixTreeRoot {
+    children: BTreeMap<char, RefCell<PrefixTree>>,
+}
+
+impl PrefixTreeRoot {
+    fn new() -> PrefixTreeRoot {
+        {
+            PrefixTreeRoot {
+                children: BTreeMap::new(),
+            }
+        }
+    }
+
+    fn create(s: &str) -> Option<PrefixTreeRoot> {
+        if let Some(c) = s.chars().next() {
+            let mut p = PrefixTreeRoot::new();
+            p.insert(s);
+            return Some(p);
+        }
+        return None;
+    }
+
+    fn insert(&mut self, s: &str) {
+        let mut i = s.chars().into_iter();
+        if let Some(val) = i.next() {
+            if let Some(child_ref) = self.children.get(&val) {
+                let mut child = child_ref.borrow_mut();
+                child.insert_iter(i);
+            } else {
+                if let Some(p) = PrefixTree::create(s) {
+                    self.children.insert(val, RefCell::new(p));
+                }
+            }
+        }
+    }
+
+    fn search(&self, key: &str) -> bool {
+        let mut i = key.chars().into_iter();
+        if let Some(val) = i.next() {
+            return self.children.get(&val).unwrap().borrow().search_iter(&val, i);
+        }
+        return false;
+    }
+
+    fn search_iter<'a>(&self, key: &char, mut i: impl Iterator<Item = char>) -> bool {
+        if let Some(val) = i.next() {
+            if self.children.contains_key(&val) {
+                let child = self.children.get(&val).unwrap();
+                return child.borrow().search_iter(&val, i);
+            } else {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    fn print(&self) -> Vec<String> {
+        let mut ret = Vec::new();
+        for (_, cell) in &self.children {
+            let child = cell.borrow();
+            let t = child.print();
+            for word in t {
+                ret.push(word);
+            }
+        }
+        return ret;
+    }
+}
+
 struct PrefixTree {
     val: char,
     children: BTreeMap<char, RefCell<PrefixTree>>,
 }
 
 impl PrefixTree {
-    fn create(s: &str) -> Option<PrefixTree> {
-        if let Some(c) = s.chars().next() {
-            let mut p = PrefixTree::new(c);
-            p.insert(s.get(1..)?);
-            return Some(p);
-        }
-        return None;
-    }
-
     fn new(v: char) -> PrefixTree {
         PrefixTree {
             val: v,
             children: BTreeMap::new(),
         }
+    }
+
+    fn create(s: &str) -> Option<PrefixTree> {
+        if let Some(c) = s.chars().next() {
+            let mut p = PrefixTree::new(c);
+            p.insert(s.get(1..).unwrap());
+            return Some(p);
+        }
+        return None;
     }
 
     fn insert(&mut self, key: &str) {
@@ -70,7 +139,6 @@ impl PrefixTree {
         return false;
     }
 
-
     fn print(&self) -> Vec<String> {
         let mut ret = Vec::new();
 
@@ -85,7 +153,7 @@ impl PrefixTree {
             let child = cell.borrow();
             let t = child.print();
             for word in t {
-                ret.push( o.clone() + &word);
+                ret.push(o.clone() + &word);
             }
         }
 
@@ -95,13 +163,15 @@ impl PrefixTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::PrefixTree;
+    use crate::{PrefixTree, PrefixTreeRoot};
 
     #[test]
     fn it_works() {
         let word = "abcd";
-        let p = PrefixTree::create(word).unwrap();
-        for word in p.print(){
+        let mut p = PrefixTreeRoot::create(word).unwrap();
+        p.insert(word);
+        p.insert("foobar");
+        for word in p.print() {
             println!("{}", word);
         }
         assert!(
