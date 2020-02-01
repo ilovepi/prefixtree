@@ -57,6 +57,19 @@ impl PrefixTreeRoot {
         return false;
     }
 
+    fn search_prefix_iter<'a>(&self, mut i: impl Iterator<Item = char> + Clone) -> bool {
+        let mut j = i.clone().peekable();
+        if let Some(val) = i.next() {
+            info!("Searching for val: {}", val);
+            match self.children.get(&val) {
+                Some(child) => return child.borrow().search_prefix(&val, i),
+                None => return false,
+            }
+        }
+        error!("Search key was empty.");
+        return true; // empty string is always a prefix
+    }
+
     pub fn dump(&self) -> Vec<String> {
         let mut ret = Vec::new();
         for (_, cell) in &self.children {
@@ -79,8 +92,9 @@ impl PrefixTreeRoot {
         self.dump().iter().map(|v| info!("{}", v)).collect()
     }
 
-    pub fn starts_with(s: &str) -> bool {
-        return false;
+    pub fn starts_with(&self, s: &str) -> bool {
+        let mut i = s.chars().into_iter();
+        self.search_prefix_iter(i)
     }
 }
 
@@ -176,6 +190,33 @@ impl PrefixTree {
         }
     }
 
+    fn search_prefix<'a>(&self, key: &char, mut i: impl Iterator<Item = char>) -> bool {
+        if self.val != *key {
+            info!("Key not found. val: {}", key);
+            return false;
+        }
+
+        info!("Currently in node '{}'", self.val);
+        match i.next() {
+            Some(val) => match self.children.get(&val) {
+                Some(child) => {
+                    info!("search found val: {}", val);
+                    return child.borrow().search_prefix(&val, i);
+                }
+                None => {
+                    info!("no matching children for val: {}", val);
+                    // iterator still has elements, and we failed to match
+                    return false;
+                }
+            },
+            None => {
+                info!("Out of chars, prefix found.");
+                // iterator is exhausted check if we're at the end of a word
+                return true;
+            }
+        }
+    }
+
     pub fn print(&self) -> Vec<String> {
         let mut ret = Vec::new();
         let mut o: String = String::new();
@@ -255,6 +296,17 @@ mod tests {
         p.debug();
         assert!(!p.search("abc"), "Found a prefix but returned a match");
     }
+    #[test]
+    fn prefix_tree_starts_with_returns_true() {
+        init_log();
+        let word = "abcd";
+        let mut p = PrefixTreeRoot::create(word).unwrap();
+        p.insert("foobar");
+        p.debug();
+        assert!(p.starts_with("abc"), "Prefix not corectly matched");
+        assert!(p.starts_with("foo"), "Prefix not corectly matched");
+    }
+
     #[test]
     fn prefix_tree_search_missing_word_returns_false() {
         init_log();
