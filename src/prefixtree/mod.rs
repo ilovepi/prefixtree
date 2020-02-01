@@ -1,4 +1,3 @@
-#[macro_use] extern crate log;
 use core::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::btree_map::BTreeMap;
